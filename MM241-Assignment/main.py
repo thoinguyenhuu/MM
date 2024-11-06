@@ -9,7 +9,7 @@ env = gym.make(
     render_mode="human",  # Comment this line to disable rendering
 )
 NUM_EPISODES = 100
-#HAHA
+
 if __name__ == "__main__":
     # Reset the environment
     observation, info = env.reset(seed=42)
