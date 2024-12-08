@@ -3,6 +3,7 @@ from policy import GreedyPolicy
 import random
 import numpy as np
 import math 
+import copy
 #Giai thuat nhanh-can
 class BranchAndBound(Policy):
     def __init__(self):
@@ -72,11 +73,11 @@ class BranchAndBound(Policy):
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
             #lưu thông tin lại để cập nhật sau 
-            temp_stocks = [stock.copy() for stock in stocks]
+            temp_stocks = [copy.deepcopy(stock) for stock in stocks]
             temp_area = self.save_area
-            temp_cut = self.save_cut.copy()
-            temp_quantity = quantity.copy()
-            temp_remaining_demands = remaining_demands.copy()
+            temp_cut = copy.deepcopy(self.save_cut)
+            temp_quantity = copy.deepcopy(quantity)
+            temp_remaining_demands = copy.deepcopy(remaining_demands)
 
             next_idx = self.save_cut[-1]["prod_id"] + 1
             old_pos = self.save_cut[-1]["position"]
