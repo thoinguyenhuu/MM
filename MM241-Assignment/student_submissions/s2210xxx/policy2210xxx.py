@@ -3,6 +3,7 @@ from policy import GreedyPolicy
 import random
 import numpy as np
 import math 
+import copy
 #Giai thuat nhanh-can
 class BranchAndBound(Policy):
     def __init__(self):
@@ -16,10 +17,10 @@ class BranchAndBound(Policy):
         demands = observation["products"]
 
         # Sắp xếp demands theo diện tích giảm dần
-        demands = sorted(demands, key=lambda x: (x["size"][0] * x["size"][1])/(x["quantity"] + 1e-9), reverse=True)   
+        demands = sorted(demands, key=lambda x: (x["size"][0] * x["size"][1]), reverse=True)   
         # Chạy giải thuật
         quantity = [demand["quantity"] for demand in demands]
-        ret =  self.branch_and_bound(stocks , self.idx, self.save_area, demands, self.save_cut , -1, quantity)
+        ret =  self.branch_and_bound(stocks , self.idx, demands , -1, quantity)
         if all(x <= 0 for x in quantity ):
             self.idx = 0 
             self.save_area = 0
@@ -27,22 +28,18 @@ class BranchAndBound(Policy):
         return ret
 
 
-    def branch_and_bound(self, stocks, stock_idx, current_area, remaining_demands, current_cut, idx , quantity): 
-            #TODO kiem tra xem da lap het products chua
+    def branch_and_bound(self, stocks, stock_idx,  remaining_demands,  idx , quantity): 
             if all(x <= 0 for x in quantity) : 
                 self.idx = 0 
                 return {"stock_idx": -1,"size": (0,0), "position": (-1,-1)}
 
-            # Lấy thông tin stock
             stock = stocks[stock_idx]
             stock_w, stock_h = self._get_stock_size_(stock)
-
-            # TODO Duyệt từng sản phẩm trong demands
             # TODO nếu có mảnh được thêm vào thì dừng giải thuật, để có thể chạy qua step render frame 
-            for demand_idx, demand in enumerate(remaining_demands): # lấy ra id của sản phẩm và kiểu sản phẩm
+            for demand_idx, demand in enumerate(remaining_demands):
                 if quantity[demand_idx] <= 0:
                     continue
-                prod_w, prod_h = demand["size"] # lấy ra chiều rộng và cao của sản phẩm
+                prod_w, prod_h = demand["size"]
                 if(demand_idx < idx): continue  
                 
                 for rotation in [(prod_w, prod_h), (prod_h, prod_w)]:
@@ -52,62 +49,55 @@ class BranchAndBound(Policy):
                             for y in range(stock_h - rotated_h + 1):
                                 if quantity[demand_idx] <= 0: break
                                 if self._can_place_(stock, (x, y), (rotated_w, rotated_h)):
-                                    # Đặt sản phẩm
                                     demand["size"] = (rotated_w, rotated_h)
                                     self.save_cut.append({"stock_idx": stock_idx, "size": demand["size"], "position": (x, y), "prod_id": demand_idx})
-                                    self.save_area = current_area + (prod_w * prod_h) # cập nhật diện tích đã cắt của stock hiện tại
+                                    self.save_area = self.save_area + (prod_w * prod_h)
                                     quantity[demand_idx] -= 1
-                                    #TODO idx sẽ check xem đang trong quá trình check xem có phương án tốt hơn không 
+                                    # nếu idx != -1 thì quay lui 
                                     if(idx != -1):
                                         self._place_piece(stock, (x, y), (rotated_w, rotated_h), demand_idx)
-                                        return self.branch_and_bound(stocks,stock_idx, current_area, remaining_demands, current_cut, demand_idx, quantity)
+                                        remaining_demands[demand_idx]["quantity"] -= 1
+                                        return self.branch_and_bound(stocks,stock_idx, remaining_demands, idx, quantity)
                                     return {"stock_idx": stock_idx, "size": demand["size"], "position": (x, y)}     
                         if(quantity[demand_idx] <= 0): break
-            
-            #TODO Nếu không có cái nào lắp vào được, ta thử xóa mảnh phía trước để lắp các mảnh nhỏ hơn vào
-            if(not np.any(stock == -1)):
+
+            # Nếu không có cái nào lắp vào được, ta thử xóa mảnh phía trước để lắp các mảnh nhỏ hơn vào
+            # Điều kiện dừng
+            if np.all(stock[0:stock_w  , 0:stock_h ] != -1): #Nếu lắp đầy stock[i] thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            if(current_cut and current_cut[-1]["prod_id"] == len(remaining_demands) - 1 ):
+            if(self.save_cut[-1]["stock_idx"] != stock_idx): # Nếu pop hết các miếng lắp cho stocks[i] thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            if(idx != -1):
-                min = 100000
-                size = None
-                for prod in remaining_demands:
-                    if(prod["quantity"] > 0):
-                        if(prod["size"][0] * prod["size"][1] < min):
-                            min = prod["size"][0] * prod["size"][1]
-                            size = prod["size"]
-                if(current_area + min > stock_w * stock_h):
-                    self.idx += 1
-                    return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            if(not current_cut):
+            if(idx == len(remaining_demands) - 1): # Nếu quay lui đến miếng prod nhỏ nhất mà vẫn ko lắp vừa thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            
+            #lưu thông tin lại để cập nhật sau 
             temp_stocks = [stock.copy() for stock in stocks]
             temp_area = self.save_area
             temp_cut = self.save_cut.copy()
             temp_quantity = quantity.copy()
+            temp_remaining_demands = remaining_demands.copy()
 
             next_idx = self.save_cut[-1]["prod_id"] + 1
             old_pos = self.save_cut[-1]["position"]
             old_size = self.save_cut[-1]["size"]
             #xóa mảnh phía trước
-            self._remove_piece(stocks[stock_idx], old_pos, old_size)
-            x = [stock.copy() for stock in stocks]
-            self.save_cut.pop()
-            quantity[next_idx] += 1
+            self._remove_piece(temp_stocks[stock_idx], old_pos, old_size)
+            self.save_cut.pop() 
+
+            quantity[next_idx -1] += 1
+            remaining_demands[next_idx - 1]["quantity"] += 1
             self.save_area -= old_size[0] * old_size[1]
-            self.branch_and_bound(stocks,stock_idx, self.save_area, remaining_demands, self.save_cut, next_idx, quantity)
+            self.branch_and_bound(temp_stocks,stock_idx, remaining_demands, next_idx, quantity)
             # check xem nếu như save_area trong quá trình quay lui xấu hơn cái vừa rồi thì đặt lại
-            if(self.save_area <= temp_area):
-                self._place_piece(stocks[stock_idx], old_pos, old_size, next_idx - 1)                
-                stocks = temp_stocks
+            if(self.save_area < temp_area):   
                 self.save_area = temp_area
                 self.save_cut = temp_cut
                 quantity = temp_quantity
+                remaining_demands = temp_remaining_demands
+            else:
+                stocks = temp_stocks
             return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
 
     # method đặt các product vào stock
