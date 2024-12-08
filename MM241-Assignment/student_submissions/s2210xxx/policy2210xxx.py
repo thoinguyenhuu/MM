@@ -66,7 +66,7 @@ class BranchAndBound(Policy):
             if np.all(stock[0:stock_w  , 0:stock_h ] != -1): #Nếu lắp đầy stock[i] thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            if(self.save_cut[-1]["stock_idx"] != stock_idx): # Nếu pop hết các miếng lắp cho stocks[i] thì dừng
+            if((not self.save_cut) or self.save_cut[-1]["stock_idx"] != stock_idx): # Nếu pop hết các miếng lắp cho stocks[i] thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
             if(idx == len(remaining_demands) - 1): # Nếu quay lui đến miếng prod nhỏ nhất mà vẫn ko lắp vừa thì dừng
