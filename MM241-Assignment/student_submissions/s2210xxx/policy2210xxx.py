@@ -3,7 +3,6 @@ from policy import GreedyPolicy
 import random
 import numpy as np
 import math 
-import copy
 #Giai thuat nhanh-can
 class BranchAndBound(Policy):
     def __init__(self):
