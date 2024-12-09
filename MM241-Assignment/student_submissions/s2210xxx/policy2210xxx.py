@@ -69,7 +69,7 @@ class BranchAndBound(Policy):
             if((not self.save_cut) or self.save_cut[-1]["stock_idx"] != stock_idx): # Nếu pop hết các miếng lắp cho stocks[i] thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
-            if(idx == len(remaining_demands) - 1): # Nếu quay lui đến miếng prod nhỏ nhất mà vẫn ko lắp vừa thì dừng
+            if(idx == len(remaining_demands)): # Nếu quay lui đến miếng prod nhỏ nhất mà vẫn ko lắp vừa thì dừng
                 self.idx += 1
                 return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
             #lưu thông tin lại để cập nhật sau 
@@ -97,7 +97,7 @@ class BranchAndBound(Policy):
                 quantity = temp_quantity
                 remaining_demands = temp_remaining_demands
             else:
-                stocks = temp_stocks
+                stocks[stock_idx][:] = temp_stocks[stock_idx]
             return {"stock_idx": -1, "size": (0, 0), "position": (-1, -1)}
 
     # method đặt các product vào stock
